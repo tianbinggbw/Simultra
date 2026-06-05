@@ -32,98 +32,47 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip3.11 install jieba
-          pip3.11 install funasr
-          pip3.11 install -r requirements.txt --no-deps
+          pip3.11 install jieba funasr -q
+          pip3.11 install -r requirements.txt --no-deps --quiet || true
         working-directory: ./python
 
       - name: Install frontend dependencies
         run: |
-          npm install
+          npm install --silent
           npm run build
         working-directory: ./src
 
       - name: Install Tauri CLI
         run: |
-          npm install -D @tauri-apps/cli@^2
+          npm install -D @tauri-apps/cli@^2 --silent
         working-directory: .
 
-      - name: Build Tauri app bundle
+      - name: Build Tauri (App + DMG)
         run: |
-          npx tauri build --bundles app
+          npx tauri build --bundles app,dmg
         working-directory: .
         env:
           GITHUB_OUTPUT: ""
           RUST_BACKTRACE: "1"
 
-      - name: Debug build output
+      - name: Debug output
         run: |
-          echo "=== Finding app bundle ==="
-          find src-tauri/target/release -name "*.app" -type d
-          ls -la src-tauri/target/release/bundle/
+          echo "=== Build output ==="
+          find src-tauri/target/release/bundle -type f \( -name "*.dmg" -o -name "*.app" \) -ls
 
-      - name: Copy Python backend to App bundle
+      - name: Find DMG
+        id: find_dmg
         run: |
-          echo "=== Finding app bundle ==="
-          APP_BUNDLE=$(find src-tauri/target/release -name "*.app" -type d 2>/dev/null | head -1)
-
-          if [ -z "$APP_BUNDLE" ]; then
-            echo "ERROR: No app bundle found"
-            exit 1
-          fi
-
-          echo "Found app bundle: $APP_BUNDLE"
-
-          RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
-          mkdir -p "$RESOURCES_DIR"
-
-          # Copy Python backend
-          cp -r python "$RESOURCES_DIR/"
-          cp start.sh "$RESOURCES_DIR/"
-          cp stop.sh "$RESOURCES_DIR/"
-          cp python/requirements.txt "$RESOURCES_DIR/"
-
-          echo "=== Python backend copied ==="
-          ls -la "$RESOURCES_DIR/"
-
-      - name: Create DMG
-        run: |
-          APP_BUNDLE=$(find src-tauri/target/release -name "*.app" -type d 2>/dev/null | head -1)
-
-          if [ -z "$APP_BUNDLE" ]; then
-            echo "ERROR: No app bundle found"
-            exit 1
-          fi
-
-          echo "Creating DMG from: $APP_BUNDLE"
-
-          DMG_DIR=src-tauri/target/release/bundle/dmg
-          mkdir -p "$DMG_DIR"
-
-          DMG_PATH="$DMG_DIR/Simultra-0.1.2.dmg"
-          TEMP_DIR=$(mktemp -d)
-
-          # Copy app to temp dir
-          cp -R "$APP_BUNDLE" "$TEMP_DIR/Simultra.app"
-
-          # Create Applications symlink
-          ln -s /Applications "$TEMP_DIR/Applications"
-
-          # Create DMG
-          hdiutil create -srcfolder "$TEMP_DIR" -volname "Simultra" -fs HFS+ "$DMG_PATH" -format UDZO
-
-          # Cleanup
-          rm -rf "$TEMP_DIR"
-
-          echo "=== DMG created successfully ==="
-          ls -la "$DMG_DIR/"
+          DMG_PATH=$(find src-tauri/target/release/bundle -name "*.dmg" -type f | head -1)
+          echo "DMG_PATH=$DMG_PATH"
+          echo "dmg_path=$DMG_PATH" >> $GITHUB_OUTPUT
 
       - name: Upload DMG
+        if: steps.find_dmg.outputs.dmg_path != ''
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: Simultra-dmg
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: ${{ steps.find_dmg.outputs.dmg_path }}
           retention-days: 5
 
   release:
@@ -152,10 +101,6 @@ jobs:
 
             AI 同声传译软件 - 完整安装包
 
-            ### 包含内容
-            - Simultra 桌面应用
-            - Python 后端（内置）
-
             ### 系统要求
             - macOS 12.0+
             - Ollama（需单独安装）
@@ -167,6 +112,5 @@ jobs:
             4. 运行 Simultra 应用
           draft: false
           prerelease: false
-          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
