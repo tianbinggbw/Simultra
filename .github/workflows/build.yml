@@ -48,9 +48,9 @@ jobs:
           npm install -D @tauri-apps/cli@^2
         working-directory: .
 
-      - name: Build Tauri app
+      - name: Build Tauri app bundle
         run: |
-          npx tauri build
+          npx tauri build --bundles app
         working-directory: .
         env:
           GITHUB_OUTPUT: ""
@@ -58,57 +58,65 @@ jobs:
 
       - name: Debug build output
         run: |
-          echo "=== Checking bundle output ==="
+          echo "=== Finding app bundle ==="
+          find src-tauri/target/release -name "*.app" -type d
           ls -la src-tauri/target/release/bundle/
-          find src-tauri/target/release/bundle -type f -name "*.dmg" 2>/dev/null
-          find src-tauri/target/release/bundle -type d -name "*.app" 2>/dev/null
 
       - name: Copy Python backend to App bundle
         run: |
-          echo "=== Looking for app bundle ==="
+          echo "=== Finding app bundle ==="
+          APP_BUNDLE=$(find src-tauri/target/release -name "*.app" -type d 2>/dev/null | head -1)
 
-          # Check if DMG already exists from Tauri
-          DMG_FILE=$(find src-tauri/target/release/bundle -name "*.dmg" -type f 2>/dev/null | head -1)
-          if [ -n "$DMG_FILE" ]; then
-            echo "Found existing DMG from Tauri: $DMG_FILE"
-
-            # Check if there's an app bundle
-            APP_BUNDLE=$(find src-tauri/target/release/bundle -name "*.app" -type d 2>/dev/null | head -1)
-
-            if [ -n "$APP_BUNDLE" ] && [ -d "$APP_BUNDLE" ]; then
-              echo "Found app bundle: $APP_BUNDLE"
-              RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
-              mkdir -p "$RESOURCES_DIR"
-              cp -r python "$RESOURCES_DIR/"
-              cp start.sh "$RESOURCES_DIR/"
-              cp stop.sh "$RESOURCES_DIR/"
-              cp python/requirements.txt "$RESOURCES_DIR/"
-              echo "=== Python backend copied ==="
-
-              # Need to recreate DMG since we modified the app bundle
-              echo "Recreating DMG with Python backend..."
-              DMG_DIR=$(dirname "$DMG_FILE")
-              rm -f "$DMG_FILE"
-
-              TEMP_DIR=$(mktemp -d)
-              cp -R "$APP_BUNDLE" "$TEMP_DIR/Simultra.app"
-              ln -s /Applications "$TEMP_DIR/Applications"
-
-              hdiutil create -srcfolder "$TEMP_DIR" -volname "Simultra" -fs HFS+ "$DMG_DIR/Simultra-0.1.2.dmg" -format UDZO
-              rm -rf "$TEMP_DIR"
-
-              echo "=== DMG recreated ==="
-              ls -la "$DMG_DIR/"
-            else
-              echo "No app bundle found, but DMG exists"
-              echo "Bundle contents:"
-              ls -laR src-tauri/target/release/bundle/
-            fi
-          else
-            echo "No DMG found in bundle directory"
-            echo "Checking what we have:"
-            ls -laR src-tauri/target/release/bundle/ 2>/dev/null | head -50
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "ERROR: No app bundle found"
+            exit 1
           fi
+
+          echo "Found app bundle: $APP_BUNDLE"
+
+          RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
+          mkdir -p "$RESOURCES_DIR"
+
+          # Copy Python backend
+          cp -r python "$RESOURCES_DIR/"
+          cp start.sh "$RESOURCES_DIR/"
+          cp stop.sh "$RESOURCES_DIR/"
+          cp python/requirements.txt "$RESOURCES_DIR/"
+
+          echo "=== Python backend copied ==="
+          ls -la "$RESOURCES_DIR/"
+
+      - name: Create DMG
+        run: |
+          APP_BUNDLE=$(find src-tauri/target/release -name "*.app" -type d 2>/dev/null | head -1)
+
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "ERROR: No app bundle found"
+            exit 1
+          fi
+
+          echo "Creating DMG from: $APP_BUNDLE"
+
+          DMG_DIR=src-tauri/target/release/bundle/dmg
+          mkdir -p "$DMG_DIR"
+
+          DMG_PATH="$DMG_DIR/Simultra-0.1.2.dmg"
+          TEMP_DIR=$(mktemp -d)
+
+          # Copy app to temp dir
+          cp -R "$APP_BUNDLE" "$TEMP_DIR/Simultra.app"
+
+          # Create Applications symlink
+          ln -s /Applications "$TEMP_DIR/Applications"
+
+          # Create DMG
+          hdiutil create -srcfolder "$TEMP_DIR" -volname "Simultra" -fs HFS+ "$DMG_PATH" -format UDZO
+
+          # Cleanup
+          rm -rf "$TEMP_DIR"
+
+          echo "=== DMG created successfully ==="
+          ls -la "$DMG_DIR/"
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -132,11 +140,6 @@ jobs:
           name: Simultra-dmg
           path: .
 
-      - name: List files
-        run: |
-          ls -la
-          find . -name "*.dmg" | head -5
-
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
@@ -150,8 +153,8 @@ jobs:
             AI 同声传译软件 - 完整安装包
 
             ### 包含内容
-            - Simultra 桌面应用（UI）
-            - Python 后端（内置，无需单独下载）
+            - Simultra 桌面应用
+            - Python 后端（内置）
 
             ### 系统要求
             - macOS 12.0+
