@@ -2,12 +2,10 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Simultra",
   "version": "1.0.0",
-  "identifier": "com.simultra.app",
+  "identifier": "com.simultra.translator",
   "build": {
     "frontendDist": "../src/dist",
-    "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "cd ../src && npm install && npm run build",
-    "beforeDevCommand": "cd ../src && npm install"
+    "devUrl": "http://localhost:5173"
   },
   "app": {
     "withGlobalTauri": true,

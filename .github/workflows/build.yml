@@ -40,6 +40,7 @@ jobs:
       - name: Install frontend dependencies
         run: |
           npm install
+          npm run build
         working-directory: ./src
 
       - name: Install Tauri CLI
