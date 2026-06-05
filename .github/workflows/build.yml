@@ -85,7 +85,7 @@ jobs:
             -srcfolder "$TEMP_DIR" \
             -ov \
             -format UDZO \
-            -compression-type zlib \
+            -compression zlib \
             src-tauri/target/release/Simultra.dmg
 
           # Clean up
