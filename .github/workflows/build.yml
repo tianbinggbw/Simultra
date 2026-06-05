@@ -89,7 +89,9 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && needs.build.result == 'success'
+    if: needs.build.result == 'success'
+    permissions:
+      contents: write
 
     steps:
       - name: Download DMG
@@ -115,12 +117,16 @@ jobs:
           ls -la
           find . -name "*.dmg" -o -name "*.app" | head -10
 
-      - name: Create Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             *.dmg
             app/*.app
             python/
+          draft: false
+          prerelease: true
+          tag_name: v0.1.0
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
