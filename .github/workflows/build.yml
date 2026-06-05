@@ -56,11 +56,89 @@ jobs:
           GITHUB_OUTPUT: ""
           RUST_BACKTRACE: "1"
 
-      - name: Debug build output
+      - name: Copy Python backend to DMG
         run: |
           echo "=== Checking bundle output ==="
-          ls -la src-tauri/target/release/bundle/ 2>/dev/null || echo "No bundle dir"
-          find src-tauri/target -name "*.dmg" -o -name "*.app" 2>/dev/null | head -5
+          ls -la src-tauri/target/release/bundle/dmg/ 2>/dev/null || echo "No dmg dir"
+          ls -la src-tauri/target/release/bundle/macos/ 2>/dev/null || echo "No macos dir"
+
+          # Find the .app bundle
+          APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
+          if [ -d "$APP_BUNDLE" ]; then
+            echo "Found app bundle: $APP_BUNDLE"
+
+            # Create Resources directory in the app bundle
+            RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
+            mkdir -p "$RESOURCES_DIR"
+
+            # Copy python backend
+            cp -r python "$RESOURCES_DIR/"
+
+            # Copy start/stop scripts
+            cp start.sh "$RESOURCES_DIR/"
+            cp stop.sh "$RESOURCES_DIR/"
+            cp python/requirements.txt "$RESOURCES_DIR/"
+
+            # Create a README for the backend
+            cat > "$RESOURCES_DIR/README.txt" << 'README'
+Simultra Python Backend Setup
+==============================
+
+This folder contains the Python backend for Simultra.
+
+Setup:
+1. pip3.11 install -r requirements.txt
+2. brew install ollama (if not installed)
+3. ollama pull llama3.2:3b
+
+Usage:
+./start.sh  # Start backend service
+./stop.sh   # Stop backend service
+
+The app will automatically connect to http://127.0.0.1:7860
+README
+
+            echo "=== Python backend copied to app bundle ==="
+            ls -la "$RESOURCES_DIR/"
+          fi
+
+      - name: Rebuild DMG with Python backend
+        run: |
+          # Re-create DMG with the modified app bundle
+          DMG_DIR=src-tauri/target/release/bundle/dmg
+          APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
+
+          if [ -d "$DMG_DIR" ] && [ -d "$APP_BUNDLE" ]; then
+            # Remove old DMG
+            rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
+
+            # Create new DMG using hdiutil
+            DMG_NAME="Simultra-0.1.2"
+            VOLUME_NAME="Simultra"
+
+            hdiutil create -size 500m -volname "$VOLUME_NAME" -fs HFS+ -type UDIF "$DMG_DIR/$DMG_NAME" -quiet
+
+            # Mount and copy
+            hdiutil attach "$DMG_DIR/$DMG_NAME.dmg" -mountpoint /Volumes/$VOLUME_NAME -quiet
+
+            # Copy app bundle
+            cp -R "$APP_BUNDLE" /Volumes/$VOLUME_NAME/
+
+            # Create Applications link
+            ln -s /Applications /Volumes/$VOLUME_NAME/Applications
+
+            hdiutil detach /Volumes/$VOLUME_NAME -quiet
+
+            hdiutil convert "$DMG_DIR/$DMG_NAME.dmg" -format UDZO -o "$DMG_DIR/Simultra-0.1.2.dmg" -quiet
+
+            rm "$DMG_DIR/$DMG_NAME.dmg"
+
+            echo "=== New DMG created ==="
+            ls -la "$DMG_DIR/"
+          else
+            echo "No DMG dir or app bundle found, keeping original files"
+            ls -la src-tauri/target/release/bundle/
+          fi
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -78,14 +156,6 @@ jobs:
           path: src-tauri/target/release/bundle/macos/*.app
           retention-days: 5
 
-      - name: Upload Python package
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Simultra-python
-          path: python/
-          retention-days: 5
-
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -100,33 +170,38 @@ jobs:
           name: Simultra-dmg
           path: .
 
-      - name: Download App
-        uses: actions/download-artifact@v4
-        with:
-          name: Simultra-app
-          path: ./app
-
-      - name: Download Python
-        uses: actions/download-artifact@v4
-        with:
-          name: Simultra-python
-          path: ./python
-
       - name: List files
         run: |
           ls -la
-          find . -name "*.dmg" -o -name "*.app" | head -10
+          find . -name "*.dmg" | head -5
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             *.dmg
-            app/*.app
-            python/
+          tag_name: v0.1.2
+          name: Simultra v0.1.2
+          body: |
+            ## Simultra v0.1.2
+
+            AI 同声传译软件 - 完整安装包
+
+            ### 包含内容
+            - Simultra 桌面应用（UI）
+            - Python 后端（内置，无需单独下载）
+
+            ### 系统要求
+            - macOS 12.0+
+            - Ollama（需单独安装）
+
+            ### 安装步骤
+            1. 双击 DMG 安装
+            2. 在 Mac 上安装 Ollama: `brew install ollama`
+            3. 下载模型: `ollama pull llama3.2:3b`
+            4. 运行 Simultra 应用
           draft: false
-          prerelease: true
-          tag_name: v0.1.0
+          prerelease: false
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
