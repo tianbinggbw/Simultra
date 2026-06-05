@@ -1,0 +1,17 @@
+{
+  "name": "simultra",
+  "version": "1.0.0",
+  "description": "AI Simultaneous Translator - Real-time meeting transcription and translation",
+  "scripts": {
+    "start": "cd python && python -m uvicorn main:app --reload --port 7860",
+    "dev": "cd python && python -m uvicorn main:app --reload --port 7860",
+    "build-ui": "echo 'UI built separately'",
+    "test": "cd python && python -m pytest tests/",
+    "pack": "python scripts/package_macos.py"
+  },
+  "build": {
+    "type": "python",
+    "runtime": "python3.11",
+    "target": "macos-arm64"
+  }
+}
