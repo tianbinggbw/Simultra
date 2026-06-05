@@ -56,10 +56,9 @@ jobs:
           GITHUB_OUTPUT: ""
           RUST_BACKTRACE: "1"
 
-      - name: Copy Python backend to DMG
+      - name: Copy Python backend to App bundle
         run: |
           echo "=== Checking bundle output ==="
-          ls -la src-tauri/target/release/bundle/dmg/ 2>/dev/null || echo "No dmg dir"
           ls -la src-tauri/target/release/bundle/macos/ 2>/dev/null || echo "No macos dir"
 
           APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
@@ -73,6 +72,32 @@ jobs:
             cp python/requirements.txt "$RESOURCES_DIR/"
             echo "=== Python backend copied to app bundle ==="
             ls -la "$RESOURCES_DIR/"
+          fi
+
+      - name: Create DMG
+        run: |
+          APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
+          DMG_DIR=src-tauri/target/release/bundle/dmg
+          mkdir -p "$DMG_DIR"
+
+          if [ -d "$APP_BUNDLE" ]; then
+            DMG_PATH="$DMG_DIR/Simultra-0.1.2.dmg"
+
+            # Create temp directory for DMG contents
+            TEMP_DIR=$(mktemp -d)
+            cp -R "$APP_BUNDLE" "$TEMP_DIR/Simultra.app"
+            ln -s /Applications "$TEMP_DIR/Applications"
+
+            # Create DMG using hdiutil
+            hdiutil create -srcfolder "$TEMP_DIR" -volname "Simultra" -fs HFS+ "$DMG_PATH" -format UDZO
+
+            rm -rf "$TEMP_DIR"
+
+            echo "=== DMG created ==="
+            ls -la "$DMG_DIR/"
+          else
+            echo "ERROR: App bundle not found"
+            exit 1
           fi
 
       - name: Upload DMG
