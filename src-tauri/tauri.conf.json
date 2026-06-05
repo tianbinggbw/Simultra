@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "identifier": "com.simultra.app",
   "build": {
-    "frontendDist": "../src",
+    "frontendDist": "../src/dist",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "",
-    "beforeDevCommand": ""
+    "beforeBuildCommand": "cd ../src && npm install && npm run build",
+    "beforeDevCommand": "cd ../src && npm install"
   },
   "app": {
     "withGlobalTauri": true,

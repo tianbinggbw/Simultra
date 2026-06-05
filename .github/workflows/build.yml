@@ -43,25 +43,24 @@ jobs:
 
       - name: Build Tauri app
         run: |
-          npx tauri build --verbose
+          npx tauri build
         working-directory: .
         env:
           GITHUB_OUTPUT: ""
+          RUST_BACKTRACE: "1"
 
-      - name: Prepare Release
+      - name: Debug build output
         run: |
-          mkdir -p release
-          cp src-tauri/target/release/bundle/dmg/*.dmg release/ 2>/dev/null || echo "No DMG found"
-          cp src-tauri/target/release/bundle/macos/*.app release/ 2>/dev/null || echo "No app found"
-          ls -la release/ || true
+          echo "=== Checking bundle output ==="
           ls -la src-tauri/target/release/bundle/ 2>/dev/null || echo "No bundle dir"
+          find src-tauri/target -name "*.dmg" -o -name "*.app" 2>/dev/null | head -5
 
       - name: Upload DMG
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-dmg
-          path: release/*.dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
           retention-days: 5
 
       - name: Upload App bundle
