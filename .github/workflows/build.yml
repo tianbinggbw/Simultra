@@ -25,10 +25,16 @@ jobs:
         with:
           targets: aarch64-apple-darwin
 
-      - name: Install Python dependencies
+      - name: Setup Python
         run: |
           brew install python@3.11
-          pip install -r requirements.txt
+          echo 'export PATH="/usr/local/opt/python@3.11/bin:$PATH"' >> $GITHUB_ENV
+          /usr/local/opt/python@3.11/bin/python3.11 --version
+          /usr/local/opt/python@3.11/bin/pip3 --version
+
+      - name: Install Python dependencies
+        run: |
+          /usr/local/opt/python@3.11/bin/pip3 install -r requirements.txt
         working-directory: ./python
 
       - name: Install frontend dependencies

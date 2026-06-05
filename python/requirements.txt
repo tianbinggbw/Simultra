@@ -1,13 +1,12 @@
-# Core
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-pydantic==2.6.1
+# Core - use compatible versions
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+pydantic>=2.0.0
 
 # Audio processing
 numpy>=1.24.0
 scipy>=1.11.0
 sounddevice>=0.4.6
-# pyaudio removed - use sounddevice instead on macOS
 
 # ASR - FunASR
 funasr>=1.0.0
