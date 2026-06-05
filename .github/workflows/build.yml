@@ -1,0 +1,75 @@
+name: Build macOS DMG
+
+on:
+  push:
+    branches: [master, main]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install Python dependencies
+        run: |
+          cd python
+          pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        run: |
+          npm install
+
+      - name: Install Tauri CLI
+        run: |
+          npm install -D @tauri-apps/cli@^2
+          npx tauri build --verbose
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Simultra-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Upload Python package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Simultra-python
+          path: |
+            python/
+            !python/__pycache__/
+            !python/**/*.pyc
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Download DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: Simultra-dmg
+          path: .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: *.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
