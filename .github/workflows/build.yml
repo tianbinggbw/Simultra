@@ -79,13 +79,12 @@ jobs:
           # Copy app to temp directory with a proper name
           cp -R "$APP_PATH" "$TEMP_DIR/$DMG_NAME.app"
 
-          # Create the DMG using hdiutil
+          # Create the DMG using hdiutil (UDZO = compressed read-only image)
           hdiutil create \
             -volname "$DMG_NAME" \
             -srcfolder "$TEMP_DIR" \
             -ov \
             -format UDZO \
-            -compression zlib \
             src-tauri/target/release/Simultra.dmg
 
           # Clean up
