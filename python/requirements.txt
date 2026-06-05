@@ -7,7 +7,7 @@ pydantic==2.6.1
 numpy>=1.24.0
 scipy>=1.11.0
 sounddevice>=0.4.6
-pyaudio>=0.2.14
+# pyaudio removed - use sounddevice instead on macOS
 
 # ASR - FunASR
 funasr>=1.0.0
