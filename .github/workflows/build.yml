@@ -62,82 +62,17 @@ jobs:
           ls -la src-tauri/target/release/bundle/dmg/ 2>/dev/null || echo "No dmg dir"
           ls -la src-tauri/target/release/bundle/macos/ 2>/dev/null || echo "No macos dir"
 
-          # Find the .app bundle
           APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
           if [ -d "$APP_BUNDLE" ]; then
             echo "Found app bundle: $APP_BUNDLE"
-
-            # Create Resources directory in the app bundle
             RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
             mkdir -p "$RESOURCES_DIR"
-
-            # Copy python backend
             cp -r python "$RESOURCES_DIR/"
-
-            # Copy start/stop scripts
             cp start.sh "$RESOURCES_DIR/"
             cp stop.sh "$RESOURCES_DIR/"
             cp python/requirements.txt "$RESOURCES_DIR/"
-
-            # Create a README for the backend
-            cat > "$RESOURCES_DIR/README.txt" << 'README'
-Simultra Python Backend Setup
-==============================
-
-This folder contains the Python backend for Simultra.
-
-Setup:
-1. pip3.11 install -r requirements.txt
-2. brew install ollama (if not installed)
-3. ollama pull llama3.2:3b
-
-Usage:
-./start.sh  # Start backend service
-./stop.sh   # Stop backend service
-
-The app will automatically connect to http://127.0.0.1:7860
-README
-
             echo "=== Python backend copied to app bundle ==="
             ls -la "$RESOURCES_DIR/"
-          fi
-
-      - name: Rebuild DMG with Python backend
-        run: |
-          # Re-create DMG with the modified app bundle
-          DMG_DIR=src-tauri/target/release/bundle/dmg
-          APP_BUNDLE=$(find src-tauri/target/release/bundle/macos -name "*.app" -type d | head -1)
-
-          if [ -d "$DMG_DIR" ] && [ -d "$APP_BUNDLE" ]; then
-            # Remove old DMG
-            rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
-
-            # Create new DMG using hdiutil
-            DMG_NAME="Simultra-0.1.2"
-            VOLUME_NAME="Simultra"
-
-            hdiutil create -size 500m -volname "$VOLUME_NAME" -fs HFS+ -type UDIF "$DMG_DIR/$DMG_NAME" -quiet
-
-            # Mount and copy
-            hdiutil attach "$DMG_DIR/$DMG_NAME.dmg" -mountpoint /Volumes/$VOLUME_NAME -quiet
-
-            # Copy app bundle
-            cp -R "$APP_BUNDLE" /Volumes/$VOLUME_NAME/
-
-            # Create Applications link
-            ln -s /Applications /Volumes/$VOLUME_NAME/Applications
-
-            hdiutil detach /Volumes/$VOLUME_NAME -quiet
-
-            hdiutil convert "$DMG_DIR/$DMG_NAME.dmg" -format UDZO -o "$DMG_DIR/Simultra-0.1.2.dmg" -quiet
-
-            rm "$DMG_DIR/$DMG_NAME.dmg"
-
-            echo "=== New DMG created ==="
-            ls -la "$DMG_DIR/"
-          else
-            echo "No DMG dir or app bundle found, keeping original files"
-            ls -la src-tauri/target/release/bundle/
           fi
 
       - name: Upload DMG
