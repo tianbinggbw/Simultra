@@ -19,12 +19,14 @@ from asr.funasr_engine import FunASREngine
 from translate.ollama_translator import OllamaTranslator
 from export.document_generator import DocumentGenerator
 from speaker.speaker_manager import SpeakerManager
+from audio.audio_capture import AudioCapture, SystemAudioCapture, AudioSource, AudioCaptureManager
 
 # 全局变量
 asr_engine: Optional[FunASREngine] = None
 translator: Optional[OllamaTranslator] = None
 document_gen: Optional[DocumentGenerator] = None
 speaker_manager: Optional[SpeakerManager] = None
+audio_manager: Optional[AudioCaptureManager] = None
 
 # 会议状态
 current_meeting = {
@@ -339,6 +341,100 @@ async def submit_feedback(feedback: Dict[str, Any]):
         }, f, ensure_ascii=False, indent=2)
 
     return {"status": "saved", "file": feedback_file}
+
+# ============== 音频捕获接口 ==============
+
+@app.get("/api/audio/devices")
+async def list_audio_devices():
+    """获取可用的音频设备"""
+    try:
+        mic_capture = AudioCapture(source=AudioSource.MICROPHONE)
+        microphones = mic_capture._list_microphones()
+        return {"microphones": microphones}
+    except Exception as e:
+        return {"microphones": [], "error": str(e)}
+
+@app.post("/api/audio/start")
+async def start_audio_capture(source: str = "microphone"):
+    """开始音频捕获"""
+    global audio_manager, asr_engine
+
+    if audio_manager is None:
+        audio_manager = AudioCaptureManager()
+
+    try:
+        if source == "system":
+            capture = SystemAudioCapture()
+        else:
+            capture = AudioCapture(source=AudioSource.MICROPHONE)
+
+        if asr_engine is None:
+            asr_engine = FunASREngine()
+
+        # 设置音频数据回调
+        async def audio_callback(chunk):
+            # 语音识别
+            result = await asr_engine.recognize_stream(chunk.data.tobytes())
+
+            if result and result.get("text"):
+                # 翻译
+                translation = await translator.translate(
+                    result["text"],
+                    source_lang=result.get("language", "en"),
+                    target_lang="zh"
+                )
+                result["translation"] = translation
+
+                # 记录到会议
+                current_meeting["transcripts"].append(result)
+
+                # 广播到 WebSocket
+                for connection in active_connections:
+                    try:
+                        await connection.send_json(result)
+                    except:
+                        pass
+
+        capture.set_callback(audio_callback)
+        capture.start()
+
+        source_type = AudioSource.SYSTEM_AUDIO if source == "system" else AudioSource.MICROPHONE
+        audio_manager.add_capture(source_type, capture)
+        audio_manager.set_active_source(source_type)
+
+        return {"status": "started", "source": source}
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/audio/stop")
+async def stop_audio_capture():
+    """停止音频捕获"""
+    global audio_manager
+
+    if audio_manager:
+        audio_manager.stop_all()
+
+    return {"status": "stopped"}
+
+# WebSocket 连接管理
+active_connections: List[WebSocket] = []
+
+@app.websocket("/ws/live")
+async def live_transcription(websocket: WebSocket):
+    """实时转录 WebSocket 连接"""
+    await websocket.accept()
+    active_connections.append(websocket)
+
+    try:
+        while True:
+            # 保持连接
+            data = await websocket.receive_text()
+            # 可以处理客户端消息
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        active_connections.remove(websocket)
 
 # ============== 入口点 ==============
 
