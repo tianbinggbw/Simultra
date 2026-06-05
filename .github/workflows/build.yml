@@ -47,50 +47,17 @@ jobs:
           npm install -D @tauri-apps/cli@^2 --silent
         working-directory: .
 
-      - name: Build Tauri app bundle
+      - name: Build Tauri app bundle and DMG
         run: |
-          npx tauri build --bundles app
+          npx tauri build --bundles app,dmg
         working-directory: .
         env:
           GITHUB_OUTPUT: ""
           RUST_BACKTRACE: "1"
 
-      - name: Find app bundle
-        id: find-app
+      - name: Find DMG
         run: |
-          APP_PATH=$(find src-tauri/target/release -name "*.app" -type d | head -1)
-          echo "Found app: $APP_PATH"
-          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
-
-      - name: Create DMG with hdiutil
-        run: |
-          APP_PATH="${{ steps.find-app.outputs.app_path }}"
-          echo "Creating DMG for: $APP_PATH"
-
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No app bundle found"
-            exit 1
-          fi
-
-          # Create a temporary directory for DMG contents
-          TEMP_DIR=$(mktemp -d)
-          DMG_NAME="Simultra"
-
-          # Copy app to temp directory with a proper name
-          cp -R "$APP_PATH" "$TEMP_DIR/$DMG_NAME.app"
-
-          # Create the DMG using hdiutil (UDZO = compressed read-only image)
-          hdiutil create \
-            -volname "$DMG_NAME" \
-            -srcfolder "$TEMP_DIR" \
-            -ov \
-            -format UDZO \
-            src-tauri/target/release/Simultra.dmg
-
-          # Clean up
-          rm -rf "$TEMP_DIR"
-
-          ls -la src-tauri/target/release/*.dmg
+          find src-tauri/target/release -name "*.dmg" -type f
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
