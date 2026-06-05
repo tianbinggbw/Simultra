@@ -28,68 +28,93 @@ jobs:
       - name: Install Python dependencies
         run: |
           brew install python@3.11
-          cd python
           pip install -r requirements.txt
+        working-directory: ./python
 
       - name: Install frontend dependencies
         run: |
-          cd src
           npm install
+        working-directory: ./src
+
+      - name: Install Tauri CLI
+        run: |
+          npm install -D @tauri-apps/cli@^2
+        working-directory: .
 
       - name: Build Tauri app
         run: |
-          cd ..
-          npm install -D @tauri-apps/cli@^2
           npx tauri build --verbose
+        working-directory: .
+        env:
+          GITHUB_OUTPUT: ""
 
       - name: Prepare Release
         run: |
           mkdir -p release
-          cp src-tauri/target/release/bundle/dmg/*.dmg release/ 2>/dev/null || true
-          cp -r src-tauri/target/release/bundle/macos/*.app release/ 2>/dev/null || true
-          cp -r python release/ 2>/dev/null || true
-          cp README.md release/
-          cp python/requirements.txt release/
+          cp src-tauri/target/release/bundle/dmg/*.dmg release/ 2>/dev/null || echo "No DMG found"
+          cp src-tauri/target/release/bundle/macos/*.app release/ 2>/dev/null || echo "No app found"
+          ls -la release/ || true
+          ls -la src-tauri/target/release/bundle/ 2>/dev/null || echo "No bundle dir"
 
       - name: Upload DMG
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-dmg
           path: release/*.dmg
           retention-days: 5
 
-      - name: Upload App
+      - name: Upload App bundle
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-app
-          path: release/*.app
+          path: src-tauri/target/release/bundle/macos/*.app
           retention-days: 5
 
       - name: Upload Python package
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-python
-          path: release/python/
+          path: python/
           retention-days: 5
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && needs.build.result == 'success'
 
     steps:
-      - name: Download all artifacts
+      - name: Download DMG
         uses: actions/download-artifact@v4
+        with:
+          name: Simultra-dmg
+          path: .
+
+      - name: Download App
+        uses: actions/download-artifact@v4
+        with:
+          name: Simultra-app
+          path: ./app
+
+      - name: Download Python
+        uses: actions/download-artifact@v4
+        with:
+          name: Simultra-python
+          path: ./python
 
       - name: List files
-        run: ls -la
+        run: |
+          ls -la
+          find . -name "*.dmg" -o -name "*.app" | head -10
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             *.dmg
-            Simultra-app/*.app
-            Simultra-python/
+            app/*.app
+            python/
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
