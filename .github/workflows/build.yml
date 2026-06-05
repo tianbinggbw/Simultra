@@ -18,7 +18,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -47,32 +47,57 @@ jobs:
           npm install -D @tauri-apps/cli@^2 --silent
         working-directory: .
 
-      - name: Build Tauri (App + DMG)
+      - name: Build Tauri app bundle
         run: |
-          npx tauri build --bundles app,dmg
+          npx tauri build --bundles app
         working-directory: .
         env:
           GITHUB_OUTPUT: ""
           RUST_BACKTRACE: "1"
 
-      - name: Debug output
+      - name: Find app bundle
+        id: find-app
         run: |
-          echo "=== Build output ==="
-          ls -la src-tauri/target/release/bundle/dmg/
-          ls -la src-tauri/target/release/bundle/macos/
+          APP_PATH=$(find src-tauri/target/release -name "*.app" -type d | head -1)
+          echo "Found app: $APP_PATH"
+          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+
+      - name: Create DMG with hdiutil
+        run: |
+          APP_PATH="${{ steps.find-app.outputs.app_path }}"
+          echo "Creating DMG for: $APP_PATH"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No app bundle found"
+            exit 1
+          fi
+
+          # Create a temporary directory for DMG contents
+          TEMP_DIR=$(mktemp -d)
+          DMG_NAME="Simultra"
+
+          # Copy app to temp directory with a proper name
+          cp -R "$APP_PATH" "$TEMP_DIR/$DMG_NAME.app"
+
+          # Create the DMG using hdiutil
+          hdiutil create \
+            -volname "$DMG_NAME" \
+            -srcfolder "$TEMP_DIR" \
+            -ov \
+            -format UDZO \
+            -compression-type zlib \
+            src-tauri/target/release/Simultra.dmg
+
+          # Clean up
+          rm -rf "$TEMP_DIR"
+
+          ls -la src-tauri/target/release/*.dmg
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-dmg
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-          retention-days: 5
-
-      - name: Upload App
-        uses: actions/upload-artifact@v4
-        with:
-          name: Simultra-app
-          path: src-tauri/target/release/bundle/macos/*.app
+          path: src-tauri/target/release/Simultra.dmg
           retention-days: 5
 
   release:
