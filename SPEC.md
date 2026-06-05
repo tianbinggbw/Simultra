@@ -166,25 +166,25 @@ os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 ### Phase 1: 基础框架 (Day 1-2)
 - [x] Tauri 项目初始化（Python FastAPI 后端）
 - [x] Python 后端框架搭建
-- [ ] React 前端框架
-- [ ] Tauri 桌面框架配置
+- [x] React 前端框架
+- [x] Tauri 桌面框架配置
 
 ### Phase 2: 核心功能 (Day 3-5)
-- [ ] 音频捕获模块（麦克风 + 系统音频）
-- [ ] funASR 集成（中英文识别）
-- [ ] Ollama 翻译集成
-- [ ] 说话人分离
+- [x] 音频捕获模块（麦克风 + 系统音频）
+- [x] funASR 集成（中英文识别）
+- [x] Ollama 翻译集成
+- [x] 说话人分离
 
 ### Phase 3: 高级功能 (Day 6-8)
-- [ ] 口音优化（印度、日本、韩国）
-- [ ] 会议纪要生成
-- [ ] 每位发言人总结
-- [ ] 用户反馈收集
+- [x] 口音优化（印度、日本、韩国）
+- [x] 会议纪要生成
+- [x] 每位发言人总结
+- [x] 用户反馈收集
 
 ### Phase 4: 文档与发布 (Day 9-10)
-- [ ] PDF/Word 导出
-- [ ] .dmg 打包（macOS 15.7.7）
-- [ ] GitHub 发布
+- [x] PDF/Word 导出
+- [x] .dmg 打包（macOS 15.7.7）
+- [x] GitHub 发布
 
 ---
 

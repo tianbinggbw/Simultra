@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout code
@@ -27,33 +27,50 @@ jobs:
 
       - name: Install Python dependencies
         run: |
+          brew install python@3.11
           cd python
           pip install -r requirements.txt
 
       - name: Install frontend dependencies
         run: |
+          cd src
           npm install
 
-      - name: Install Tauri CLI
+      - name: Build Tauri app
         run: |
+          cd ..
           npm install -D @tauri-apps/cli@^2
           npx tauri build --verbose
 
-      - name: Upload DMG artifact
+      - name: Prepare Release
+        run: |
+          mkdir -p release
+          cp src-tauri/target/release/bundle/dmg/*.dmg release/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/macos/*.app release/ 2>/dev/null || true
+          cp -r python release/ 2>/dev/null || true
+          cp README.md release/
+          cp python/requirements.txt release/
+
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-dmg
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: release/*.dmg
+          retention-days: 5
+
+      - name: Upload App
+        uses: actions/upload-artifact@v4
+        with:
+          name: Simultra-app
+          path: release/*.app
+          retention-days: 5
 
       - name: Upload Python package
         uses: actions/upload-artifact@v4
         with:
           name: Simultra-python
-          path: |
-            python/
-            !python/__pycache__/
-            !python/**/*.pyc
-          if-no-files-found: ignore
+          path: release/python/
+          retention-days: 5
 
   release:
     needs: build
@@ -61,15 +78,18 @@ jobs:
     if: github.event_name == 'release'
 
     steps:
-      - name: Download DMG
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
-        with:
-          name: Simultra-dmg
-          path: .
+
+      - name: List files
+        run: ls -la
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: *.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            *.dmg
+            Simultra-app/*.app
+            Simultra-python/
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
