@@ -91,20 +91,25 @@ export const useMeetingStore = create<MeetingStore>((set, get) => ({
 
   addTranscript: (transcript) => {
     const id = generateId();
-    const speaker = get().speakers.find((s) => s.id === transcript.speakerId);
+    const state = get();
+    let speakerName = transcript.speakerName;
+    const speaker = state.speakers.find((s) => s.id === transcript.speakerId);
 
     // 如果没有这个发言人，自动添加
     if (!speaker) {
       const newSpeaker: Speaker = {
         id: transcript.speakerId,
-        name: `Speaker ${get().speakers.length + 1}`,
+        name: `Speaker ${state.speakers.length + 1}`,
         color: generateColor(),
       };
-      get().addSpeaker(newSpeaker);
+      state.addSpeaker(newSpeaker);
+      speakerName = newSpeaker.name;
+    } else if (!speakerName) {
+      speakerName = speaker.name;
     }
 
     set((state) => ({
-      transcripts: [...state.transcripts, { ...transcript, id }],
+      transcripts: [...state.transcripts, { ...transcript, id, speakerName }],
       currentSpeakerId: transcript.speakerId,
     }));
   },

@@ -63,14 +63,11 @@ class SpeakerManager:
         return [
             {
                 "speaker_id": sid,
-                "name": stats.get("name", name),
+                "name": self._speaker_names.get(sid, f"Speaker_{sid}"),
                 "utterance_count": stats.get("utterance_count", 0),
                 "first_seen": stats.get("first_seen")
             }
-            for sid, (name, stats) in zip(
-                self._speaker_names.keys(),
-                [self._speaker_stats[sid] for sid in self._speaker_names.keys()]
-            )
+            for sid, stats in self._speaker_stats.items()
         ]
 
     def update_stats(self, speaker_id: str, duration: float = 0.0):
