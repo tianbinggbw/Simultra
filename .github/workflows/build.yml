@@ -59,6 +59,11 @@ jobs:
         env:
           RUST_BACKTRACE: "1"
 
+      - name: Debug DMG location
+        run: |
+          ls -la src-tauri/target/release/bundle/dmg/ || echo "Directory not found"
+          find src-tauri/target/release -name "*.dmg" -type f 2>/dev/null || echo "No DMG found"
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
